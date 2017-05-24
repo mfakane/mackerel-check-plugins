@@ -1,0 +1,46 @@
+#!/bin/bash
+
+STATUS_OK=0
+STATUS_WARNING=1
+STATUS_CRITICAL=2
+STATUS_UNKNOWN=3
+
+unitname="$1"
+
+if [ -z "$unitname" ]; then
+	echo "Usage: $(basename "$0") UNITNAME"
+	exit $STATUS_UNKNOWN
+fi
+
+maxlines=5
+exitstate=$STATUS_CRITICAL
+unitstate=$(systemctl is-active "$unitname")
+searchstr="Started"
+
+case "$unitstate" in
+	active)
+		exitstate=$STATUS_OK
+		;;
+	failed)
+		;;
+	inactive)
+		exitstate=$STATUS_UNKNOWN
+		searchstr="Stopped"
+		;;
+esac
+
+log=""
+
+while read -r i; do
+	log="$i\n$log"
+
+	case "$i" in
+		*$searchstr*)
+			break
+			;;
+	esac
+done < <(journalctl -b -u "$unitname" -n $maxlines | tac)
+
+echo -ne "$log"
+
+exit $exitstate
